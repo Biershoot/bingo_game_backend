@@ -11,15 +11,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-
 public class DrawnNumber {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    private Game game;
+    @JoinColumn(name = "game_id", nullable = false)
+    private Game game; // Juego asociado a esta balota
 
     @Column(nullable = false)
-    private Integer number;
+    private Integer number; // Número de la balota
 }
+

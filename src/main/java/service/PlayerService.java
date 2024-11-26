@@ -7,24 +7,39 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import repository.PlayerRepository;
 
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+
 @Service
 public class PlayerService {
+
     @Autowired
     private PlayerRepository playerRepository;
 
     public Player generateCard(User user, Game game) {
-        String card = generateRandomCard();
+        Set<Integer> card = generateRandomCard();
         Player player = Player.builder()
                 .user(user)
                 .game(game)
-                .card(card)
+                .card(card.toString())
                 .build();
         return playerRepository.save(player);
     }
 
-    private String generateRandomCard() {
-        // Lógica para generar un tarjetón de bingo en formato JSON
-        // Ejemplo simplificado
-        return "{ \"B\": [1, 2, 3], \"I\": [16, 17, 18], \"N\": [31, 32, 33], \"G\": [46, 47, 48], \"O\": [61, 62, 63] }";
+    public Player getPlayerById(Long playerId) {
+        return playerRepository.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Jugador con ID " + playerId + " no encontrado."));
+    }
+
+    private Set<Integer> generateRandomCard() {
+        // Lógica para generar un tarjetón único de Bingo con 25 números aleatorios
+        Set<Integer> card = new HashSet<>();
+        Random random = new Random();
+        while (card.size() < 25) {
+            int number = random.nextInt(75) + 1; // Números de 1 a 75
+            card.add(number);
+        }
+        return card;
     }
 }

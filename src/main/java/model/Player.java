@@ -17,12 +17,12 @@ public class Player {
     private Long id;
 
     @ManyToOne
-    private User user;
+    private User user; // Usuario asociado al jugador
 
     @ManyToOne
     private Game game;
 
     @Lob
     @Column(nullable = false)
-    private String card; // JSON del tarjetón
+    private String card; // Tarjetón almacenado como JSON en la base de datos
 }
