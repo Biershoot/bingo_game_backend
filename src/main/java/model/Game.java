@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,6 +34,9 @@ public class Game {
     @OneToMany(mappedBy = "game", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<DrawnNumber> drawnNumbers; // Balotas extraídas asociadas al juego
 
+    @OneToMany(mappedBy = "game", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Player> players = new ArrayList<>(); // Lista de jugadores conectados al juego (lobby)
+
     /**
      * Devuelve los números de las balotas extraídas para el juego.
      */
@@ -40,7 +45,29 @@ public class Game {
                 .map(DrawnNumber::getNumber)
                 .collect(Collectors.toSet());
     }
+
+    /**
+     * Añade un jugador al juego.
+     */
+    public void addPlayer(Player player) {
+        if (!this.players.contains(player)) {
+            this.players.add(player);
+            player.setGame(this); // Asociar el jugador al juego
+        }
+    }
+
+    /**
+     * Elimina un jugador del juego.
+     */
+    public void removePlayer(Player player) {
+        if (this.players.contains(player)) {
+            this.players.remove(player);
+            player.setGame(null); // Disociar el jugador del juego
+        }
+    }
 }
+
+
 
 
 

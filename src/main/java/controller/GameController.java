@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import service.BingoVerificationService;
 import service.GameService;
 import service.PlayerService;
+import controller.NotificationController;
 
 @RestController
 @RequestMapping("/game")
@@ -16,69 +17,118 @@ public class GameController {
     private final GameService gameService;
     private final PlayerService playerService;
     private final BingoVerificationService bingoVerificationService;
+    private final NotificationController notificationController;
 
-    // Inyección por constructor (mejor práctica)
-    public GameController(GameService gameService, PlayerService playerService, BingoVerificationService bingoVerificationService) {
+    // Dependency Injection via constructor
+    public GameController(GameService gameService, PlayerService playerService,
+                          BingoVerificationService bingoVerificationService,
+                          NotificationController notificationController) {
         this.gameService = gameService;
         this.playerService = playerService;
         this.bingoVerificationService = bingoVerificationService;
+        this.notificationController = notificationController;
     }
 
     /**
-     * Inicia un nuevo juego.
+     * Starts a new game.
      *
-     * @return El juego recién creado.
+     * @return The newly created game.
      */
     @PostMapping("/start")
     public ResponseEntity<Game> startGame() {
-        Game game = gameService.startGame();
-        return ResponseEntity.ok(game);
+        try {
+            Game game = gameService.startGame();
+            return ResponseEntity.ok(game);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 
     /**
-     * Finaliza un juego existente.
+     * Ends an existing game.
      *
-     * @param gameId ID del juego a finalizar.
-     * @return Mensaje de confirmación.
+     * @param gameId ID of the game to end.
+     * @return Confirmation message.
      */
     @PostMapping("/{gameId}/end")
     public ResponseEntity<String> endGame(@PathVariable Long gameId) {
-        Game game = gameService.getGameById(gameId);
-        gameService.endGame(game);
-        return ResponseEntity.ok("El juego ha sido finalizado.");
+        try {
+            Game game = gameService.getGameById(gameId);
+            if (!game.isActive()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El juego ya ha finalizado.");
+            }
+            gameService.endGame(game);
+            return ResponseEntity.ok("El juego ha sido finalizado.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al finalizar el juego.");
+        }
     }
 
     /**
-     * Declara un ganador para el juego.
+     * Declares a Bingo for a player.
      *
-     * @param gameId   ID del juego.
-     * @param playerId ID del jugador declarado ganador.
-     * @return Mensaje de confirmación.
+     * @param gameId   ID of the game.
+     * @param playerId ID of the player declaring Bingo.
+     * @return Confirmation message.
      */
     @PostMapping("/{gameId}/bingo")
     public ResponseEntity<String> declareBingo(@PathVariable Long gameId, @RequestParam Long playerId) {
-        // Obtener el juego por ID
-        Game game = gameService.getGameById(gameId);
-        if (game == null) {
-            return ResponseEntity.badRequest().body("El juego no existe.");
-        }
+        try {
+            Game game = gameService.getGameById(gameId);
+            if (!game.isActive()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El juego ya ha finalizado.");
+            }
 
-        // Obtener el jugador y su tarjetón
-        Player player = playerService.getPlayerById(playerId);
-        if (player == null) {
-            return ResponseEntity.badRequest().body("El jugador no existe.");
-        }
+            Player player = playerService.getPlayerById(playerId);
+            if (player == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El jugador no existe.");
+            }
 
-        // Validar Bingo
-        boolean isValidBingo = bingoVerificationService.isBingo(player.getCard(), game.getDrawnBalls());
-        if (isValidBingo) {
-            // Declarar el jugador como ganador del juego
-            gameService.declareWinner(game, player);
-            return ResponseEntity.ok("¡Bingo válido! Jugador " + player.getUser().getUsername() + " ha ganado.");
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("¡Bingo inválido! Jugador " + player.getUser().getUsername() + " es descalificado.");
+            boolean isValidBingo = bingoVerificationService.isBingo(player.getCard(), game.getDrawnBalls());
+            if (isValidBingo) {
+                gameService.declareWinner(game, player);
+                return ResponseEntity.ok("¡Bingo válido! Jugador " + player.getUser().getUsername() + " ha ganado.");
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("¡Bingo inválido! Jugador " + player.getUser().getUsername() + " es descalificado.");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al procesar la declaración de Bingo.");
+        }
+    }
+
+    /**
+     * Allows a player to join a game lobby.
+     *
+     * @param gameId   ID of the game.
+     * @param playerId ID of the player.
+     * @return Confirmation message.
+     */
+    @PostMapping("/{gameId}/join")
+    public ResponseEntity<String> joinGame(@PathVariable Long gameId, @RequestParam Long playerId) {
+        try {
+            // Validate game
+            Game game = gameService.getGameById(gameId);
+            if (!game.isActive()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El juego no está activo.");
+            }
+
+            // Validate player
+            Player player = playerService.getPlayerById(playerId);
+            if (player == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El jugador no existe.");
+            }
+
+            // Add player to the game
+            gameService.addPlayerToGame(game, player);
+
+            // Notify other players
+            notificationController.notifyPlayerJoined(player.getUser().getUsername());
+            return ResponseEntity.ok("Jugador " + player.getUser().getUsername() + " se ha unido al juego.");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error al unir al jugador al juego.");
         }
     }
 }
+
 
